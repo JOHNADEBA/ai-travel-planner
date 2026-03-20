@@ -8,4 +8,4 @@ pydantic-settings==2.2.0
 sqlalchemy==2.0.23
 python-multipart==0.0.9
 python-dateutil==2.8.2
-psycopg2-binary==2.9.9  # For Neon PostgreSQL
+psycopg2-binary==2.9.9
