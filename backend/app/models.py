@@ -4,6 +4,7 @@ from datetime import date, datetime
 
 # Request Models
 class TravelPreferences(BaseModel):
+    origin: str  
     destination: str  # Required now, no more "anywhere"
     budget: Literal["budget", "moderate", "luxury"] = "moderate"
     start_date: date

@@ -116,7 +116,7 @@ async def generate_itinerary(
         
         # Add mock flights if requested
         if request.include_flights:
-            origin = "JFK"
+            origin = request.preferences.origin
             print(f"✈️ Fetching flights from {origin} to {request.preferences.destination}...")
             
             flights = await flight_api.search_flights(

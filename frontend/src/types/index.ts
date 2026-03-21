@@ -2,6 +2,7 @@ export type Budget = 'budget' | 'moderate' | 'luxury'
 export type TravelStyle = 'solo' | 'couple' | 'family' | 'friends'
 
 export interface TravelPreferences {
+  origin: string  
   destination: string
   budget: Budget
   start_date: string

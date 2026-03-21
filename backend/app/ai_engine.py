@@ -42,7 +42,6 @@ class AIEngine:
             return self._validate_and_format(itinerary, preferences)
             
         except Exception as e:
-            print(f"❌ AI Error: {e}")
             return self._get_fallback_itinerary(preferences)
     
     def _build_prompt(self, prefs: Dict[str, Any]) -> str:
@@ -105,6 +104,7 @@ class AIEngine:
         """Destination-specific fallback itinerary with hotels and car rentals"""
         
         destination = prefs.get('destination', 'Paris, France')
+        origin = prefs.get('origin', 'JFK') 
         start_date = prefs.get('start_date', '2025-04-01')
         end_date = prefs.get('end_date', '2025-04-07')
         
@@ -169,6 +169,7 @@ class AIEngine:
         
         return {
             "destination": destination,
+            "origin": origin,
             "duration_days": days,
             "daily_plans": daily_plans,
             "total_cost_estimate": content.get("total_cost", 850),

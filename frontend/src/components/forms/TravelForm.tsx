@@ -4,7 +4,7 @@ import { forwardRef, useImperativeHandle, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { MapPin, Users, Sparkles } from "lucide-react";
+import { MapPin, Users, Sparkles, Plane } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
@@ -13,6 +13,7 @@ import type { LocationSuggestion, Budget, TravelStyle } from "@/types";
 
 const travelSchema = z
   .object({
+    origin: z.string().min(2, "Origin city is required"),
     destination: z.string().min(2, "Destination is required"),
     budget: z.enum(["budget", "moderate", "luxury"]),
     start_date: z.string().min(1, "Start date is required"),
@@ -47,6 +48,7 @@ interface TravelFormProps {
 
 export interface TravelFormRef {
   setDestination: (city: string) => void;
+  setOrigin: (city: string) => void;
 }
 
 const budgetOptions: { value: Budget; label: string; emoji: string }[] = [
@@ -80,6 +82,10 @@ const TravelForm = forwardRef<TravelFormRef, TravelFormProps>(
     const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
     const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
+    const [originSuggestions, setOriginSuggestions] = useState<
+      LocationSuggestion[]
+    >([]);
+    const [showOriginSuggestions, setShowOriginSuggestions] = useState(false);
 
     const {
       register,
@@ -90,20 +96,22 @@ const TravelForm = forwardRef<TravelFormRef, TravelFormProps>(
     } = useForm<FormData>({
       resolver: zodResolver(travelSchema),
       defaultValues: {
+        origin: "",
         budget: "moderate",
         travelers: 2,
         travel_style: "couple",
       },
     });
 
-    // Expose setDestination method to parent
+    // Expose methods to parent
     useImperativeHandle(ref, () => ({
       setDestination: (city: string) => {
         setValue("destination", city, { shouldValidate: true });
       },
+      setOrigin: (city: string) => {
+        setValue("origin", city, { shouldValidate: true });
+      },
     }));
-
-    const destination = watch("destination");
 
     const handleDestinationChange = async (
       e: React.ChangeEvent<HTMLInputElement>,
@@ -125,10 +133,37 @@ const TravelForm = forwardRef<TravelFormRef, TravelFormProps>(
       }
     };
 
-    const selectSuggestion = (suggestion: LocationSuggestion) => {
+    const handleOriginChange = async (
+      e: React.ChangeEvent<HTMLInputElement>,
+    ) => {
+      const value = e.target.value;
+      setValue("origin", value);
+
+      if (value.length > 2) {
+        try {
+          const results = await searchApi.locations(value);
+          setOriginSuggestions(results);
+          setShowOriginSuggestions(true);
+        } catch (error) {
+          console.error("Failed to fetch suggestions:", error);
+        }
+      } else {
+        setOriginSuggestions([]);
+        setShowOriginSuggestions(false);
+      }
+    };
+
+    const selectSuggestion = (
+      suggestion: LocationSuggestion,
+      field: "origin" | "destination",
+    ) => {
       const cityName = suggestion.city || suggestion.name;
-      setValue("destination", cityName, { shouldValidate: true });
-      setShowSuggestions(false);
+      setValue(field, cityName, { shouldValidate: true });
+      if (field === "origin") {
+        setShowOriginSuggestions(false);
+      } else {
+        setShowSuggestions(false);
+      }
     };
 
     const toggleInterest = (interest: string) => {
@@ -167,6 +202,36 @@ const TravelForm = forwardRef<TravelFormRef, TravelFormProps>(
         </div>
 
         <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6">
+          {/* Origin City */}
+          <div className="relative">
+            <Input
+              label="Where are you flying from?"
+              placeholder="e.g., New York, London, Tokyo..."
+              {...register("origin")}
+              onChange={handleOriginChange}
+              error={errors.origin?.message}
+              icon={<Plane size={18} className="text-primary-400" />}
+            />
+            {showOriginSuggestions && originSuggestions.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-secondary-800 border border-secondary-700 rounded-lg shadow-xl max-h-60 overflow-auto">
+                {originSuggestions.map((suggestion) => (
+                  <button
+                    key={suggestion.id}
+                    type="button"
+                    onClick={() => selectSuggestion(suggestion, "origin")}
+                    className="w-full px-4 py-2 text-left hover:bg-secondary-700 transition-colors"
+                  >
+                    <p className="text-white text-sm">{suggestion.full_name}</p>
+                    <p className="text-secondary-400 text-xs">
+                      {suggestion.code} • {suggestion.type} •{" "}
+                      {suggestion.country}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Destination */}
           <div className="relative">
             <Input
@@ -183,7 +248,7 @@ const TravelForm = forwardRef<TravelFormRef, TravelFormProps>(
                   <button
                     key={suggestion.id}
                     type="button"
-                    onClick={() => selectSuggestion(suggestion)}
+                    onClick={() => selectSuggestion(suggestion, "destination")}
                     className="w-full px-4 py-2 text-left hover:bg-secondary-700 transition-colors"
                   >
                     <p className="text-white text-sm">{suggestion.full_name}</p>
@@ -197,7 +262,7 @@ const TravelForm = forwardRef<TravelFormRef, TravelFormProps>(
             )}
           </div>
 
-          {/* Date Range - Stack on mobile, side by side on desktop */}
+          {/* Date Range - Fixed mobile alignment */}
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <Input
@@ -206,6 +271,7 @@ const TravelForm = forwardRef<TravelFormRef, TravelFormProps>(
                 min={getMinDate()}
                 {...register("start_date")}
                 error={errors.start_date?.message}
+                className="w-full"
               />
             </div>
             <div className="flex-1">
@@ -215,6 +281,7 @@ const TravelForm = forwardRef<TravelFormRef, TravelFormProps>(
                 min={getMinDate()}
                 {...register("end_date")}
                 error={errors.end_date?.message}
+                className="w-full"
               />
             </div>
           </div>
@@ -226,13 +293,13 @@ const TravelForm = forwardRef<TravelFormRef, TravelFormProps>(
               <label className="block text-sm font-medium text-secondary-300 mb-2">
                 Budget
               </label>
-              <div className="flex gap-2 h-10 sm:h-auto">
+              <div className="flex gap-2">
                 {budgetOptions.map((option) => (
                   <button
                     key={option.value}
                     type="button"
                     onClick={() => setValue("budget", option.value)}
-                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all h-10 sm:h-auto flex items-center justify-center ${
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                       watch("budget") === option.value
                         ? "bg-gradient-to-r from-primary-500 to-secondary-500 text-white"
                         : "bg-secondary-800 text-secondary-400 hover:bg-secondary-700"
@@ -255,7 +322,6 @@ const TravelForm = forwardRef<TravelFormRef, TravelFormProps>(
                 {...register("travelers", { valueAsNumber: true })}
                 error={errors.travelers?.message}
                 icon={<Users size={16} />}
-                className="h-10"
               />
             </div>
           </div>
@@ -271,7 +337,7 @@ const TravelForm = forwardRef<TravelFormRef, TravelFormProps>(
                   key={option.value}
                   type="button"
                   onClick={() => setValue("travel_style", option.value)}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all h-10 sm:h-auto flex items-center justify-center ${
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                     watch("travel_style") === option.value
                       ? "bg-gradient-to-r from-primary-500 to-secondary-500 text-white"
                       : "bg-secondary-800 text-secondary-400 hover:bg-secondary-700"
