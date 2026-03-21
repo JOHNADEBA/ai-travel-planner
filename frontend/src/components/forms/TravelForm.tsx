@@ -11,6 +11,12 @@ import { Card } from "@/components/ui/Card";
 import { searchApi } from "@/lib/api";
 import type { LocationSuggestion, Budget, TravelStyle } from "@/types";
 
+// Helper function to get today's date in YYYY-MM-DD format
+const getTodayDate = () => {
+  const today = new Date();
+  return today.toISOString().split("T")[0];
+};
+
 const travelSchema = z
   .object({
     origin: z.string().min(2, "Origin city is required"),
@@ -23,6 +29,19 @@ const travelSchema = z
     travel_style: z.enum(["solo", "couple", "family", "friends"]),
     special_requirements: z.string().optional(),
   })
+  .refine(
+    (data) => {
+      const start = new Date(data.start_date);
+      const end = new Date(data.end_date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return start >= today;
+    },
+    {
+      message: "Start date cannot be in the past",
+      path: ["start_date"],
+    },
+  )
   .refine(
     (data) => {
       const start = new Date(data.start_date);
@@ -184,10 +203,7 @@ const TravelForm = forwardRef<TravelFormRef, TravelFormProps>(
       onSubmit(preferences, includeFlights, includeWeather);
     };
 
-    const getMinDate = () => {
-      const today = new Date();
-      return today.toISOString().split("T")[0];
-    };
+    const todayDate = getTodayDate();
 
     return (
       <Card className="p-6 md:p-8">
@@ -263,27 +279,24 @@ const TravelForm = forwardRef<TravelFormRef, TravelFormProps>(
           </div>
 
           {/* Date Range - Fixed mobile alignment */}
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <Input
-                label="Start Date"
-                type="date"
-                min={getMinDate()}
-                {...register("start_date")}
-                error={errors.start_date?.message}
-                className="w-full"
-              />
-            </div>
-            <div className="flex-1">
-              <Input
-                label="End Date"
-                type="date"
-                min={getMinDate()}
-                {...register("end_date")}
-                error={errors.end_date?.message}
-                className="w-full"
-              />
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Start Date"
+              type="date"
+              min={todayDate}
+              {...register("start_date")}
+              error={errors.start_date?.message}
+              className=""
+            />
+
+            <Input
+              label="End Date"
+              type="date"
+              min={todayDate}
+              {...register("end_date")}
+              error={errors.end_date?.message}
+              className=""
+            />
           </div>
 
           {/* Budget & Travelers - Stack on mobile, side by side on desktop */}
@@ -410,14 +423,17 @@ const TravelForm = forwardRef<TravelFormRef, TravelFormProps>(
           {watch("start_date") && watch("end_date") && (
             <div
               className={`text-xs ${
+                new Date(watch("start_date")) >= new Date(todayDate) &&
                 new Date(watch("start_date")) <= new Date(watch("end_date"))
                   ? "text-green-500"
                   : "text-red-500"
               }`}
             >
-              {new Date(watch("start_date")) <= new Date(watch("end_date"))
-                ? `📅 Trip duration: ${Math.ceil((new Date(watch("end_date")).getTime() - new Date(watch("start_date")).getTime()) / (1000 * 60 * 60 * 24))} days`
-                : "⚠️ End date must be after start date"}
+              {new Date(watch("start_date")) < new Date(todayDate)
+                ? "⚠️ Start date cannot be in the past"
+                : new Date(watch("start_date")) <= new Date(watch("end_date"))
+                  ? `📅 Trip duration: ${Math.ceil((new Date(watch("end_date")).getTime() - new Date(watch("start_date")).getTime()) / (1000 * 60 * 60 * 24))} days`
+                  : "⚠️ End date must be after start date"}
             </div>
           )}
 
